@@ -1,5 +1,9 @@
+from collections import namedtuple
+
 import numpy as np
 import scipy.stats
+
+DelongTestResult = namedtuple("DelongTestResult", ["p_value", "log10_p_value"])
 
 
 def compute_midrank(x):
@@ -45,7 +49,7 @@ def fastDeLong(predictions_sorted_transposed, label_1_count):
 
 
 def calc_pvalue(aucs, sigma, epsilon=1e-10):
-    """Computes log(10) of p-values, with regularization to handle singular covariance matrices."""
+    """Computes p-value and log10(p-value), with regularization for singular covariance matrices."""
     l = np.array([[1, -1]])
     sigma += np.eye(sigma.shape[0]) * epsilon  # Regularization term
     try:
@@ -54,8 +58,12 @@ def calc_pvalue(aucs, sigma, epsilon=1e-10):
         print(f"FloatingPointError: {e}")
         print(f"aucs: {aucs}")
         print(f"sigma: {sigma}")
-        return np.nan
-    return np.log10(2) + scipy.stats.norm.logsf(z, loc=0, scale=1) / np.log(10)
+        return DelongTestResult(p_value=np.nan, log10_p_value=np.nan)
+    log10_p_value = float(
+        np.log10(2) + scipy.stats.norm.logsf(z, loc=0, scale=1) / np.log(10)
+    )
+    p_value = 10 ** log10_p_value
+    return DelongTestResult(p_value=p_value, log10_p_value=log10_p_value)
 
 
 def compute_ground_truth_statistics(ground_truth):
@@ -76,7 +84,10 @@ def delong_roc_variance(ground_truth, predictions):
 
 
 def delong_roc_test(ground_truth, predictions_one, predictions_two):
-    """Computes log(p-value) for hypothesis that two ROC AUCs are different."""
+    """Compare two ROC AUCs using DeLong's test.
+
+    Returns a DelongTestResult with both p_value and log10_p_value.
+    """
     order, label_1_count = compute_ground_truth_statistics(ground_truth)
     predictions_sorted_transposed = np.vstack((predictions_one, predictions_two))[:, order]
     aucs, delongcov = fastDeLong(predictions_sorted_transposed, label_1_count)

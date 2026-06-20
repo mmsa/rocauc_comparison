@@ -1,1 +1,1 @@
-from .delong import delong_roc_test, delong_roc_variance
+from .delong import DelongTestResult, delong_roc_test, delong_roc_variance
